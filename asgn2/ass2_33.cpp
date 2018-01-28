@@ -7,9 +7,11 @@
 #include <ctime>
 #include <fcntl.h>
 #include <string.h>
+#include <vector>
 #include <sys/wait.h>
 
 #define MAX_ARGS 100
+#define MAX_PIPES 20
 
 using namespace std;
 
@@ -68,6 +70,54 @@ int get_args_redirect(char *line,char **args)
 	}
 	// *args = '\0';
 	return argno;
+}
+
+int get_args_pipe(char *line, vector<char*> &args)
+{
+
+	int i = 0;
+	int argno=1;
+	
+	args[i] = line;
+	cout<<"HERE2"<<endl;
+	while(*line != '\0')
+	{
+		while(*line != '\0' || *line != '|')
+		{
+			if (*line == ' ')
+			{
+				*line++ = '\0';
+				args[i]++;
+				args[i] = line;
+				argno++;
+			}
+			if(*line == '<' || *line =='>')
+			{
+				*line++ = '\0';
+				*line++;
+				args[i] = line;
+				// argno++;
+				break;
+			}
+			*line++;
+
+		}
+		while(*line != '\0' || *line != '|')
+		{
+			if(*line == ' ')
+			{
+				*line++ = '\0';
+				break;
+			}
+			*line++;
+		}
+		if(*line =='\0') break;
+		*line++;
+		i++;
+	}
+	
+	// *args = '\0';
+	return i+1;
 }
 
 void basic_run()
@@ -154,6 +204,63 @@ void redirect_run(bool isInput)
 	return;
 }
 
+vector<string> break_pipe_args(string s)
+{
+	int len = s.length();
+	vector<string> ans;
+	int first = 0;
+	for(int i=0;i<len;i++)
+	{
+		if(s[i] == '|')
+		{
+			ans.push_back(s.substr(first,i-first));
+			first = i+1;
+		}
+	}
+	ans.push_back(s.substr(first,len-first));
+	return ans;
+}
+
+void pipe_run()
+{
+	
+	string s;
+	getline(cin,s);
+	vector<string> args = break_pipe_args(s);
+	int n = args.size();
+	for(int i=0;i<n;i++)
+	{
+		char *arg[MAX_ARGS];
+		char *s_char = const_cast<char *>(args[i].c_str());
+		int nargs = get_args_redirect(s_char,arg);
+		args[nargs] = NULL;
+		int x = fork();
+		if(x==0)
+		{
+			//i/o
+			//excevp()
+		}
+
+
+	}
+	/*char *s_char = const_cast<char *>(s.c_str());
+	char *dummy[MAX_ARGS];
+	vector<char*> args(MAX_PIPES, new );
+
+	int n = get_args_pipe(s_char, args);
+	cout<<n<<endl;*/
+	/*for(int i=0;i<n;i++)
+	{
+		int j = 0;
+		char * temp = args[i];
+		while(temp[j] !=NULL)
+		{
+			cout<<temp[j]<<' ';
+		}
+		cout<<endl;
+	}*/
+}
+
 int main()
 {
 	while(1)
@@ -181,6 +288,7 @@ int main()
 				basic_run();
 				break;
 			case 'F':
+				pipe_run();
 				break;
 			default:
 				cout<<"Invalid option"<<endl;
