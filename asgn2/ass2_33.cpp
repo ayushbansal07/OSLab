@@ -233,7 +233,7 @@ void pipe_run()
 		char *arg[MAX_ARGS];
 		char *s_char = const_cast<char *>(args[i].c_str());
 		int nargs = get_args_redirect(s_char,arg);
-		args[nargs] = NULL;
+		arg[nargs] = NULL;
 		int x = fork();
 		if(x==0)
 		{
