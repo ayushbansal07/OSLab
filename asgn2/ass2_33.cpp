@@ -122,6 +122,22 @@ int get_args_pipe(char *line, vector<char*> &args)
 
 void basic_run()
 {
+	/*
+	int cdind = 0;
+	bool cdcheck = false;
+	for (int i=0;i<nargs;i++)
+	{
+		if (strcmp(args, "cd") == 0)
+		{
+			cdind = i;
+			cdcheck = true;
+		} 
+	}
+	if (cdcheck == true)
+	{
+		chdir(args[cdind+1]);
+	}
+	*/
 	string s;
 	getline(cin,s);
 	//cout<<s<<endl;
@@ -131,6 +147,12 @@ void basic_run()
 	char *s_char = const_cast<char *>(s.c_str());
 	nargs = get_args(s_char,args);
 	args[nargs] = NULL;
+
+	if (strcmp(args[0], "cd") == 0 || strcmp(args[0], "chdir") == 0)
+	{
+		chdir(args[1]);
+	} 
+
 	int status;
 	bool isBackground = (strcmp(args[nargs-1],"&")==0);
 	if(isBackground)
@@ -204,6 +226,27 @@ void redirect_run(bool isInput)
 	return;
 }
 
+string trim(string s)
+{
+	int len = s.length();
+	int i = 0;
+	int first = 0;
+	int last = len-1;
+	while(i<len && s[i]==' ')
+	{
+		i++;
+	}
+	first = i;
+	i = len-1;
+	while(i>=0 && s[i] ==' ')
+	{
+		i--;
+	}
+	last = i;
+	return s.substr(first, last-first+1);
+
+}
+
 vector<string> break_pipe_args(string s)
 {
 	int len = s.length();
@@ -213,11 +256,11 @@ vector<string> break_pipe_args(string s)
 	{
 		if(s[i] == '|')
 		{
-			ans.push_back(s.substr(first,i-first));
+			ans.push_back(trim(s.substr(first,i-first)));
 			first = i+1;
 		}
 	}
-	ans.push_back(s.substr(first,len-first));
+	ans.push_back(trim(s.substr(first,len-first)));
 	return ans;
 }
 
@@ -228,43 +271,59 @@ void pipe_run()
 	getline(cin,s);
 	vector<string> args = break_pipe_args(s);
 	int n = args.size();
+	int pipes[2*(n-1)];
+	cout<<n<<endl;
+	for(int i=0;i<n-1;i++)
+	{
+		pipe(pipes+2*i);
+	}
 	for(int i=0;i<n;i++)
 	{
 		char *arg[MAX_ARGS];
 		char *s_char = const_cast<char *>(args[i].c_str());
 		int nargs = get_args_redirect(s_char,arg);
 		arg[nargs] = NULL;
+		/*cout<<nargs<<endl;
+		for(int j=0;j<nargs;j++)
+		{
+			cout<<arg[j]<<' ';
+		}*/
+		int status;
 		int x = fork();
 		if(x==0)
 		{
 			//i/o
-			//excevp()
+			if(i!=0)
+			{
+				dup2(pipes[2*(i-1)],0);
+				close(pipes[2*i-1]);
+			}
+			if(i!=n-1)
+			{
+				dup2(pipes[2*i+1],1);
+				if(i!=0)
+					close(pipes[2*(i-1)]);
+			}
+
+
+			/*for(int j=0;j<n-1;j++)
+			{
+				close(pipes[j]);
+			}*/
+			execvp(arg[0],arg);
 		}
+		
 
 
 	}
-	/*char *s_char = const_cast<char *>(s.c_str());
-	char *dummy[MAX_ARGS];
-	vector<char*> args(MAX_PIPES, new );
-
-	int n = get_args_pipe(s_char, args);
-	cout<<n<<endl;*/
-	/*for(int i=0;i<n;i++)
-	{
-		int j = 0;
-		char * temp = args[i];
-		while(temp[j] !=NULL)
-		{
-			cout<<temp[j]<<' ';
-		}
-		cout<<endl;
-	}*/
+	
 }
 
 int main()
 {
 	while(1)
 	{
+		cout<< "----------------\nA.Run an internal command \nB.Run an external command  \nC.Run an external command by redirecting standard input from a file \nD.Run an external command by redirecting standard output to a file \nE.Run an external command in the background F.Run several external commands in the pipe mode \nG.Quit the shell "<< endl;
 		char option;
 		cin>>option;
 		getchar();
