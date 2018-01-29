@@ -122,25 +122,8 @@ int get_args_pipe(char *line, vector<char*> &args)
 
 void basic_run()
 {
-	/*
-	int cdind = 0;
-	bool cdcheck = false;
-	for (int i=0;i<nargs;i++)
-	{
-		if (strcmp(args, "cd") == 0)
-		{
-			cdind = i;
-			cdcheck = true;
-		} 
-	}
-	if (cdcheck == true)
-	{
-		chdir(args[cdind+1]);
-	}
-	*/
 	string s;
 	getline(cin,s);
-	//cout<<s<<endl;
 
 	char *args[MAX_ARGS];
 	int nargs = 0;
@@ -306,15 +289,20 @@ void pipe_run()
 			}
 
 
-			/*for(int j=0;j<n-1;j++)
+			for(int j=0;j<n-1;j++)
 			{
-				close(pipes[j]);
-			}*/
+				close(pipes[2*j]);
+				close(pipes[2*j+1]);
+			}
 			execvp(arg[0],arg);
 		}
-		
 
+	}
 
+	for(int j=0;j<n-1;j++)
+	{
+		close(pipes[2*j]);
+		close(pipes[2*j+1]);
 	}
 	
 }
