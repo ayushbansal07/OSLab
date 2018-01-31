@@ -311,7 +311,7 @@ int main()
 {
 	while(1)
 	{
-		cout<< "----------------\nA.Run an internal command \nB.Run an external command  \nC.Run an external command by redirecting standard input from a file \nD.Run an external command by redirecting standard output to a file \nE.Run an external command in the background F.Run several external commands in the pipe mode \nG.Quit the shell "<< endl;
+		cout<< "----------------\nA.Run an internal command \nB.Run an external command  \nC.Run an external command by redirecting standard input from a file \nD.Run an external command by redirecting standard output to a file \nE.Run an external command in the background \nF.Run several external commands in the pipe mode \nG.Quit the shell "<< endl;
 		char option;
 		cin>>option;
 		getchar();

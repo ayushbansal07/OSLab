@@ -61,8 +61,8 @@ bool isEmpty(fifo * f)
 
 bool insert(fifo * f, int v)
 {
-	/*if(isFull(f))
-		return false;*/
+	if(isFull(f))
+		return false;
 	f->data[f->end] = v;
 	f->end = (f->end + 1)%SIZE_OF_FIFO;
 	return true;
@@ -70,8 +70,8 @@ bool insert(fifo * f, int v)
 
 int dequeue(fifo *f)
 {
-	/*if(isEmpty(f))
-		return -1;*/
+	if(isEmpty(f))
+		return -1;
 	int out = f->data[f->front];
 	f->front = (f->front + 1)%SIZE_OF_FIFO;
 	return out;
@@ -126,9 +126,15 @@ int main()
 			sleep(time);
 
 			fifo * ptr =  (fifo *)shmat(shm_id, NULL, 0);
+			if(ptr == (fifo *)-1)
+			{
+				cout<<"shmat Error in Producer "<<i<<endl;
+				exit(-1);
+			}
 			while(isFull(ptr)){}
 			insert(ptr, prime);
 			cout<<"Producer "<<i<<": "<<prime<<", Time: "<<time<<endl;
+			shmdt(ptr);
 			break;
 		}
 
@@ -146,14 +152,23 @@ int main()
 			sleep(time);
 
 			fifo * ptr =  (fifo *)shmat(shm_id, NULL, 0);
+			if(ptr == (fifo *)-1)
+			{
+				cout<<"shmat Error in Consumer "<<i<<endl;
+				exit(-1);
+			}
 			while(isEmpty(ptr)){}
 			int result = dequeue(ptr);
 			cout<<"Consumer "<<i<<": "<<result<<", Time: "<<time<<endl;
+			shmdt(ptr);
 			break;
 		}
 	}
 
 	sleep(30);
+
+	shmdt(list);
+
 	for(int i=0;i<np;i++)
 	{
 		kill(producers[i],SIGKILL);
