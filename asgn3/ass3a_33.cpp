@@ -15,6 +15,14 @@ using namespace std;
 
 typedef pair<int, int> PI;
 
+class Compare
+{
+public:
+	bool operator()(PI a, PI b){
+		return a.S > b.S;
+	}
+};
+
 double uniform_rand_generator()
 {
 	int n = 1 + rand()%RAND_MOD;
@@ -45,12 +53,10 @@ vector<int> expnential_rand_0to10(int n){
 
 double FCFS(vector<PI> processes, int n)
 {
-	sort(processes.begin(),processes.end());
 	double taa = 0;
 	int curr = 0;
 	FOR(i,0,n)
 	{
-		cout<<processes[i].F<<" "<<processes[i].S<<endl;
 		curr += processes[i].S;
 		taa += curr - processes[i].F;
 	}
@@ -62,7 +68,6 @@ double round_robin(vector<PI> processes, int n, int delta)
 {
 	double taa = 0;
 	queue<PI> q;
-	sort(processes.begin(),processes.end());
 	q.push(processes[0]);
 	int j = 1;
 	int curr = 0;
@@ -74,7 +79,7 @@ double round_robin(vector<PI> processes, int n, int delta)
 			q.push(processes[j]);
 			curr = processes[j].F;
 			j++;
-			if(j>=n) break;
+			//if(j>=n) break;
 		}
 
 
@@ -107,7 +112,45 @@ double round_robin(vector<PI> processes, int n, int delta)
 	}
 
 	return taa/n;
+}
 
+double SJF(vector<PI>processes, int n)
+{
+	double taa = 0;
+	priority_queue<PI, vector<PI>, Compare> q;
+	q.push(processes[0]);
+	int j = 1;
+	int curr = 0;
+	while(!q.empty() || j<n)
+	{
+		//q empty
+		if(q.empty())
+		{
+			q.push(processes[j]);
+			curr = processes[j].F;
+			j++;
+		}
+
+
+		PI pr = q.top();
+		q.pop();
+		int finishtime = curr + pr.S;
+		if(j<n && processes[j].F <= finishtime)
+		{
+			q.push(processes[j]);
+			pr.S = finishtime - processes[j].F;
+			q.push(pr);
+			curr = processes[j].F;
+			j++;
+		}
+		else
+		{
+			curr = finishtime;
+			taa += curr - pr.F;
+		}
+	}
+
+	return taa/n;
 
 }
 
@@ -122,19 +165,29 @@ int main()
 	processes[0].S = uniform_rand_1to20();
 	FOR(i,1,n)
 	{
-		processes[i].F = rands[i-1];
+		processes[i].F = rands[i-1] + processes[i-1].F;
 		processes[i].S = uniform_rand_1to20();
 	}
+	cout<<"Arrival Time\t\tCPU Burst Time"<<endl;
 	FOR(i,0,n)
 	{
-		cout<<processes[i].F<<" "<<processes[i].S<<endl;
+		cout<<processes[i].F<<"\t\t\t"<<processes[i].S<<endl;
 	}
 	cout<<"-------------------"<<endl;
 	double taa_FCS = FCFS(processes,n);
 	cout<<"Average Turn around time for FCS is "<<taa_FCS<<endl;
 
-	double taa_rr = round_robin(processes, n, 1);
-	cout<<"Average Turn around time for RR with delta = 1 is "<<taa_rr<<endl;
+	double taa_SJF = SJF(processes,n);
+	cout<<"Average Turn around time for Pre-emptive SJF is "<<taa_SJF<<endl;
+
+	double taa_rr1 = round_robin(processes, n, 1);
+	cout<<"Average Turn around time for RR with delta = 1 is "<<taa_rr1<<endl;
+
+	double taa_rr2 = round_robin(processes, n, 2);
+	cout<<"Average Turn around time for RR with delta = 2 is "<<taa_rr2<<endl;
+
+	double taa_rr5 = round_robin(processes, n, 5);
+	cout<<"Average Turn around time for RR with delta = 5 is "<<taa_rr5<<endl;
 
 
 
