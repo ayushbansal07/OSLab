@@ -1,5 +1,0 @@
-a.out
-ass1_33_1a.cpp
-ass2_33.cpp
-my
-myoutfile.txt
