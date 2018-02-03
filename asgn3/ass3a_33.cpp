@@ -3,6 +3,7 @@
 #include <math.h>
 #include <vector>
 #include<algorithm>
+#include <queue>
 
 #define RAND_MOD 997
 #define EPSILON 0.0001
@@ -40,7 +41,6 @@ vector<int> expnential_rand_0to10(int n){
 		ans[i] = (int)((v[i]/maxm)*10.0);
 	}
 	return ans;
-	
 }
 
 double FCFS(vector<PI> processes, int n)
@@ -56,6 +56,59 @@ double FCFS(vector<PI> processes, int n)
 	}
 
 	return taa/n;
+}
+
+double round_robin(vector<PI> processes, int n, int delta)
+{
+	double taa = 0;
+	queue<PI> q;
+	sort(processes.begin(),processes.end());
+	q.push(processes[0]);
+	int j = 1;
+	int curr = 0;
+	while(!q.empty() || j<n)
+	{
+		//if q is empty
+		if(q.empty())
+		{
+			q.push(processes[j]);
+			curr = processes[j].F;
+			j++;
+			if(j>=n) break;
+		}
+
+
+		PI pr = q.front();
+		q.pop();
+		int next_tq = curr + delta;
+		int finishtime = curr + pr.S;
+		while(j<n && processes[j].F<=finishtime && processes[j].F<=next_tq)
+		{
+			q.push(processes[j]);
+			j++;
+		}
+		if(finishtime <= next_tq)
+		{
+			taa += finishtime - pr.F;
+			while(j<n && processes[j].F<=next_tq)
+			{
+				q.push(processes[j]);
+				j++;
+			}
+		}
+		else
+		{
+			pr.S = finishtime - next_tq;
+			q.push(pr);
+		}
+		curr = next_tq;
+
+
+	}
+
+	return taa/n;
+
+
 }
 
 int main()
@@ -79,6 +132,10 @@ int main()
 	cout<<"-------------------"<<endl;
 	double taa_FCS = FCFS(processes,n);
 	cout<<"Average Turn around time for FCS is "<<taa_FCS<<endl;
+
+	double taa_rr = round_robin(processes, n, 1);
+	cout<<"Average Turn around time for RR with delta = 1 is "<<taa_rr<<endl;
+
 
 
 }
