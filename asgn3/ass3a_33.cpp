@@ -2,18 +2,24 @@
 #include <stdlib.h>
 #include <math.h>
 #include <vector>
-#include<algorithm>
+#include <algorithm>
 #include <queue>
+#include <fstream>
 
 #define RAND_MOD 997
 #define EPSILON 0.0001
 #define FOR(name,initial,final) for(int name=initial;name<final;name++)
 #define F first
 #define S second
+#define NO_OF_ITERATIONS 10
 
 using namespace std;
 
 typedef pair<int, int> PI;
+
+struct results{
+	double taa_FCS, taa_SJF, taa_rr1, taa_rr2, taa_rr5;
+};
 
 class Compare
 {
@@ -154,41 +160,99 @@ double SJF(vector<PI>processes, int n)
 
 }
 
-int main()
-{
-	int n;
-	cout<<"Enter the Number of Processes, N"<<endl;
-	cin>>n;
+void run(int n, vector<pair<int, results> > &v){
+	results res;
 	vector<PI> processes(n);
 	vector<int> rands = expnential_rand_0to10(n-1);
 	processes[0].F = 0;
-	processes[0].S = uniform_rand_1to20();
+	processes[0].S = uniform_rand_1to20();	
 	FOR(i,1,n)
 	{
 		processes[i].F = rands[i-1] + processes[i-1].F;
 		processes[i].S = uniform_rand_1to20();
 	}
-	cout<<"Arrival Time\t\tCPU Burst Time"<<endl;
+
+	/*cout<<"Arrival Time\t\tCPU Burst Time"<<endl;
 	FOR(i,0,n)
 	{
 		cout<<processes[i].F<<"\t\t\t"<<processes[i].S<<endl;
 	}
-	cout<<"-------------------"<<endl;
-	double taa_FCS = FCFS(processes,n);
-	cout<<"Average Turn around time for FCS is "<<taa_FCS<<endl;
+	cout<<"-------------------"<<endl;*/
+	res.taa_FCS = FCFS(processes,n);
+	cout<<"Average Turn around time for FCS is "<<res.taa_FCS<<endl;
 
-	double taa_SJF = SJF(processes,n);
-	cout<<"Average Turn around time for Pre-emptive SJF is "<<taa_SJF<<endl;
+	res.taa_SJF = SJF(processes,n);
+	cout<<"Average Turn around time for Pre-emptive SJF is "<<res.taa_SJF<<endl;
 
-	double taa_rr1 = round_robin(processes, n, 1);
-	cout<<"Average Turn around time for RR with delta = 1 is "<<taa_rr1<<endl;
+	res.taa_rr1 = round_robin(processes, n, 1);
+	cout<<"Average Turn around time for RR with delta = 1 is "<<res.taa_rr1<<endl;
 
-	double taa_rr2 = round_robin(processes, n, 2);
-	cout<<"Average Turn around time for RR with delta = 2 is "<<taa_rr2<<endl;
+	res.taa_rr2 = round_robin(processes, n, 2);
+	cout<<"Average Turn around time for RR with delta = 2 is "<<res.taa_rr2<<endl;
 
-	double taa_rr5 = round_robin(processes, n, 5);
-	cout<<"Average Turn around time for RR with delta = 5 is "<<taa_rr5<<endl;
+	res.taa_rr5 = round_robin(processes, n, 5);
+	cout<<"Average Turn around time for RR with delta = 5 is "<<res.taa_rr5<<endl;
 
+	v.push_back(make_pair(n,res));
+	return;
+}
+
+int main()
+{
+	vector<pair<int, results> > v;
+	FOR(i,0,NO_OF_ITERATIONS)
+	{
+		cout<<"Iteration "<<i<<endl;
+		cout<<"N = 10"<<endl;
+		run(10,v);
+		cout<<"N = 50"<<endl;
+		run(50,v);
+		cout<<"N = 100"<<endl;
+		run(100,v);
+		cout<<"======================================="<<endl;
+	}
+
+	results dummy;
+	dummy.taa_FCS = 0;
+	dummy.taa_SJF = 0;
+	dummy.taa_rr1 = 0;
+	dummy.taa_rr2 = 0;
+	dummy.taa_rr5 = 0;
+	vector<pair<results, int> > avg_time(3,make_pair(dummy,0));
+	FOR(i,0,3*NO_OF_ITERATIONS)
+	{
+		int a = v[i].F;
+		results r = v[i].S;
+		int id;
+		if(a==10) id = 0;
+		else if(a==50) id = 1;
+		else id = 2;
+		avg_time[id].F.taa_FCS += r.taa_FCS;
+		avg_time[id].F.taa_SJF += r.taa_SJF;
+		avg_time[id].F.taa_rr1 += r.taa_rr1;
+		avg_time[id].F.taa_rr2 += r.taa_rr2;
+		avg_time[id].F.taa_rr5 += r.taa_rr5;
+		avg_time[id].S += 1;
+	} 
+
+
+	ofstream outfile;
+	outfile.open("results.txt");
+	FOR(j,0,3)
+	{
+		if(j==0) outfile<<10<<endl;
+		else if(j==1) outfile<<50<<endl;
+		else outfile<<100<<endl;
+
+		outfile<<(avg_time[j].F.taa_FCS/avg_time[j].S)<<endl;
+		outfile<<(avg_time[j].F.taa_SJF/avg_time[j].S)<<endl;
+		outfile<<(avg_time[j].F.taa_rr1/avg_time[j].S)<<endl;
+		outfile<<(avg_time[j].F.taa_rr2/avg_time[j].S)<<endl;
+		outfile<<(avg_time[j].F.taa_rr5/avg_time[j].S)<<endl;
+	}
+
+	outfile.close();
+	
 
 
 }
