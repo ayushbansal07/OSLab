@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <queue>
 #include <fstream>
+#include <string>
+#include <sstream>
 
 #define RAND_MOD 997
 #define EPSILON 0.0001
@@ -212,46 +214,34 @@ int main()
 		cout<<"======================================="<<endl;
 	}
 
-	results dummy;
-	dummy.taa_FCS = 0;
-	dummy.taa_SJF = 0;
-	dummy.taa_rr1 = 0;
-	dummy.taa_rr2 = 0;
-	dummy.taa_rr5 = 0;
-	vector<pair<results, int> > avg_time(3,make_pair(dummy,0));
-	FOR(i,0,3*NO_OF_ITERATIONS)
+	for(int i=0;i<3*NO_OF_ITERATIONS;i+=3)
 	{
-		int a = v[i].F;
-		results r = v[i].S;
-		int id;
-		if(a==10) id = 0;
-		else if(a==50) id = 1;
-		else id = 2;
-		avg_time[id].F.taa_FCS += r.taa_FCS;
-		avg_time[id].F.taa_SJF += r.taa_SJF;
-		avg_time[id].F.taa_rr1 += r.taa_rr1;
-		avg_time[id].F.taa_rr2 += r.taa_rr2;
-		avg_time[id].F.taa_rr5 += r.taa_rr5;
-		avg_time[id].S += 1;
-	} 
-
-
-	ofstream outfile;
-	outfile.open("results.txt");
-	FOR(j,0,3)
-	{
-		if(j==0) outfile<<10<<endl;
-		else if(j==1) outfile<<50<<endl;
-		else outfile<<100<<endl;
-
-		outfile<<(avg_time[j].F.taa_FCS/avg_time[j].S)<<endl;
-		outfile<<(avg_time[j].F.taa_SJF/avg_time[j].S)<<endl;
-		outfile<<(avg_time[j].F.taa_rr1/avg_time[j].S)<<endl;
-		outfile<<(avg_time[j].F.taa_rr2/avg_time[j].S)<<endl;
-		outfile<<(avg_time[j].F.taa_rr5/avg_time[j].S)<<endl;
+		ofstream outfile;
+		stringstream ss;
+		ss<<(i/3);
+		string filename = ss.str();
+		filename = "result_"+filename + ".txt";
+		outfile.open(filename.c_str());
+		outfile<<v[i].F<<endl;
+		outfile<<v[i].S.taa_FCS<<endl;
+		outfile<<v[i].S.taa_SJF<<endl;
+		outfile<<v[i].S.taa_rr1<<endl;
+		outfile<<v[i].S.taa_rr2<<endl;
+		outfile<<v[i].S.taa_rr5<<endl;
+		outfile<<v[i+1].F<<endl;
+		outfile<<v[i+1].S.taa_FCS<<endl;
+		outfile<<v[i+1].S.taa_SJF<<endl;
+		outfile<<v[i+1].S.taa_rr1<<endl;
+		outfile<<v[i+1].S.taa_rr2<<endl;
+		outfile<<v[i+1].S.taa_rr5<<endl;
+		outfile<<v[i+2].F<<endl;
+		outfile<<v[i+2].S.taa_FCS<<endl;
+		outfile<<v[i+2].S.taa_SJF<<endl;
+		outfile<<v[i+2].S.taa_rr1<<endl;
+		outfile<<v[i+2].S.taa_rr2<<endl;
+		outfile<<v[i+2].S.taa_rr5<<endl;
+		outfile.close();
 	}
-
-	outfile.close();
 	
 
 
