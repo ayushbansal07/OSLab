@@ -103,18 +103,20 @@ double round_robin(vector<PI> processes, int n, int delta)
 		if(finishtime <= next_tq)
 		{
 			taa += finishtime - pr.F;
-			while(j<n && processes[j].F<=next_tq)
+			/*while(j<n && processes[j].F<=next_tq)
 			{
 				q.push(processes[j]);
 				j++;
-			}
+			}*/
+			curr = finishtime;
 		}
 		else
 		{
 			pr.S = finishtime - next_tq;
 			q.push(pr);
+			curr = next_tq;
 		}
-		curr = next_tq;
+		
 
 
 	}
@@ -178,8 +180,8 @@ void run(int n, vector<pair<int, results> > &v){
 	FOR(i,0,n)
 	{
 		cout<<processes[i].F<<"\t\t\t"<<processes[i].S<<endl;
-	}
-	cout<<"-------------------"<<endl;*/
+	}*/
+	cout<<"-------------------"<<endl;
 	res.taa_FCS = FCFS(processes,n);
 	cout<<"Average Turn around time for FCS is "<<res.taa_FCS<<endl;
 
@@ -201,6 +203,7 @@ void run(int n, vector<pair<int, results> > &v){
 
 int main()
 {
+	
 	vector<pair<int, results> > v;
 	FOR(i,0,NO_OF_ITERATIONS)
 	{
