@@ -10,6 +10,7 @@
 
 #define FOR(name,initial,final) for(long name=initial;name<final;name++)
 #define TIME_QUANTUM 1
+#define REPORT_FREQ 500000
 
 using namespace std;
 
@@ -35,7 +36,7 @@ void sig_wake(int sigid){}
 void *worker_func(void * threadid)
 {
 	long tid = (long) threadid;
-	cout<<tid<<endl;
+	//cout<<tid<<endl;
 	unsigned int seed = (unsigned int) tid;
 	//Generate 1000 and integers
 	//sort the thousand integers
@@ -64,32 +65,36 @@ void *scheduler_func(void * threadid)
 		stat.curr = next_proc;
 		pthread_kill(WORKERS[stat.curr],SIGUSR2);
 		sleep(TIME_QUANTUM);
+		next_proc = get_next_process(stat.curr);
 	}	
 	cout<<"Scheduler exiting"<<endl;
 }
 
 void *reporter_func(void * threadid)
 {
+	int last = stat.curr;
+	vector<bool> already_terminated(n,false);
+	while(1)
+	{
+		if(last != stat.curr)
+		{
+			cout<<"Worker "<<last<<" put to sleep, Worker "<<stat.curr<<" woken up"<<endl;
+			last = stat.curr;
+		}
+		FOR(i,0,n)
+		{
+			if(already_terminated[i] != stat.terminated[i]){
+				cout<<"Worker "<<i<<" Terminated..."<<endl;
+				already_terminated[i] = true;
+			}
+		}
 
+		usleep(REPORT_FREQ);
+	}
 }
 
 int main()
 {
-	/*pthread_t t1, t2;
-	int a1,a2;
-
-
-
-	a1 = pthread_create(&t1, NULL, thread_func,(void *)"Thread 1");
-	if(a1)	cout<<"Error creating Thread"<<endl;
-
-	a2 = pthread_create(&t2, NULL, thread_func ,(void *)"Thread 2");
-	if(a2)	cout<<"Error creating Thread"<<endl;
-
-	pthread_join(t1,NULL);
-	pthread_join(t2,NULL);
-*/
-
 	signal(SIGUSR1,sig_sleep);
 	signal(SIGUSR2,sig_wake);
 
@@ -106,21 +111,13 @@ int main()
 	FOR(i,0,n)
 	{
 		rc = pthread_create(&WORKERS[i],NULL,worker_func, (void *) i);
-		//Uncomment if not starting with thread 0
-		//pthread_kill(WORKERS[i],SIGUSR1);
-		pthread_join(WORKERS[i],NULL);
-
+		pthread_kill(WORKERS[i],SIGUSR1);
 	}
-
 	pthread_create(&SCHEDULER, NULL, scheduler_func,(void *) "Scheduler");
 	pthread_create(&REPORTER, NULL, reporter_func,(void *) "Reporter");
 
+	pthread_kill(WORKERS[0],SIGUSR2);
 	pthread_join(SCHEDULER,NULL);
-
-
-
-
-
 
 
 }
