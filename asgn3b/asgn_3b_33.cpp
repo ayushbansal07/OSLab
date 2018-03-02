@@ -7,10 +7,13 @@
 #include <signal.h>
 #include <vector>
 #include <unistd.h>
+#include <algorithm>
 
 #define FOR(name,initial,final) for(long name=initial;name<final;name++)
 #define TIME_QUANTUM 1
 #define REPORT_FREQ 500000
+#define MAX_INT 10000
+#define NO_OF_RAND_INTS 1000
 
 using namespace std;
 
@@ -38,13 +41,19 @@ void *worker_func(void * threadid)
 	long tid = (long) threadid;
 	//cout<<tid<<endl;
 	unsigned int seed = (unsigned int) tid;
-	//Generate 1000 and integers
-	//sort the thousand integers
+	vector<int> v(NO_OF_RAND_INTS);
+	FOR(i,0,NO_OF_RAND_INTS)
+	{
+		v[i] = rand_r(&seed)%MAX_INT;
+	}
+	sort(v.begin(),v.end());
 	int to_sleep = 1 + rand_r(&seed)%10;
-	sleep(to_sleep);
+	while(to_sleep)
+	{
+		to_sleep = sleep(to_sleep);
+	}
 	stat.terminated[tid] = true;
 }
-
 int get_next_process(int curr)
 {
 	FOR(i,1,n+1)
