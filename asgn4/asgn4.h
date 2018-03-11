@@ -1,7 +1,7 @@
 #ifndef ASGN4_H
 #define ASGN4_H
 
-#include<bitset>
+#include <bitset>
 #include <ctime>
 
 #define MAX_ALLOCATED_SIZE 128 //MB
@@ -23,7 +23,7 @@ struct INode{
 	bool filetype;
 	int filesize;
 	time_t last_modified;
-	time_t last_red;
+	time_t last_read;
 	char access_permission[3];
 	int direct_pointers[8];
 	int indirect_pointer;
@@ -31,7 +31,7 @@ struct INode{
 };
 
 struct InodeList{
-	Inode inode_list[MAX_INODES];
+	Inode node[MAX_INODES];
 };
 
 struct Block{
@@ -54,7 +54,7 @@ struct DIRECTORY_ENTRY{
 	short int inode_no;
 };
 
-extern char* myfs_mem;
+extern char* myfs;
 extern int cur_dir;
 
 int create_myfs(int size);
