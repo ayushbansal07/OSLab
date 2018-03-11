@@ -7,6 +7,9 @@
 #define MAX_ALLOCATED_SIZE 128 //MB
 #define DISKBLOCK_SIZE 256
 #define MAX_INODES 256
+
+using namespace std;
+
 #define MAX_NO_OF_DISKBLOCKS 65536 //64K, max allocated 128MB memory
 
 struct SuperBlock{
@@ -19,7 +22,7 @@ struct SuperBlock{
 	bitset<MAX_INODES> free_inodes;
 };
 
-struct INode{
+struct Inode{
 	bool filetype;
 	int filesize;
 	time_t last_modified;
@@ -49,9 +52,14 @@ const int INODE_LIST_BYTES = INODE_LIST_BLOCKS*DISKBLOCK_SIZE;
 
 #define FILENAME_SIZE 30
 
-struct DIRECTORY_ENTRY{
+struct DirectoryEntry{
 	char filename[FILENAME_SIZE];
 	short int inode_no;
+};
+
+#define FILES_PER_DIR 8
+struct Directory{
+	DirectoryEntry entry[FILES_PER_DIR];
 };
 
 extern char* myfs;
