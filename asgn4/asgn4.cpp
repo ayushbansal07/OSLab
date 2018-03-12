@@ -77,6 +77,67 @@ int get_inode()
 	return -1;
 }
 
+int* get_inode_ptr(Inode * inode, int idx)
+{
+	if(idx < NUM_DIRECT_POINTERS)
+		return (inode->direct_pointers + idx);
+	idx -= NUM_DIRECT_POINTERS;
+	if(idx < BLOCKS_INDIRECT_PTR)
+	{
+		int * ptr = (int *)(myfs + DISKBLOCK_SIZE*inode->indirect_pointer + idx*4);
+		return ptr;
+	}
+	idx -= BLOCKS_INDIRECT_PTR;
+	int ptr_idx = idx/BLOCKS_INDIRECT_PTR;
+	int* iptr = (int*)(myfs + DISKBLOCK_SIZE*inode->indirect_pointer + ptr_idx*4);
+	int* ptr = (int*)(myfs + DISKBLOCK_SIZE*(*iptr) + (idx%BLOCKS_INDIRECT_PTR)*4);
+	return ptr;
+}
+
+int get_dataBlock()
+{
+	SuperBlock * sb = (SuperBlock *)myfs;
+	for(int i=0;i<MAX_NO_OF_DISKBLOCKS;i++)
+	{
+		if(sb->free_diskBlocks[i]==0)
+		{
+			sb->actual_diskBlocks += 1;
+			sb->free_diskBlocks[i] = 1;
+			return i;
+		}
+	}
+	return -1;
+}
+
+int get_dir_block(Directory * dir)
+{
+	for(int i=0;i<FILES_PER_DIR;i++)
+	{
+		if(dir->entry[i].inode_no==-1)
+			return i;
+	}
+	return -1;
+}
+
+void enter_in_dir(Inode * dir, char * filename, int fileptr)
+{
+	int idx = dir->filesize / FILES_PER_DIR;
+	//TOSEE
+	int *ptr = get_inode_ptr(dir, idx);
+	if(*ptr == -1)
+	{
+		*ptr = get_dataBlock();
+		Directory * mydir = (Directory *)(myfs + DISKBLOCK_SIZE*(*ptr));
+		init_dir(mydir);
+	}
+	Directory * mydir = (Directory *)(myfs + DISKBLOCK_SIZE*(*ptr));
+	int id = get_dir_block(mydir);
+	strcpy(mydir->entry[id].filename, filename);
+	mydir->entry[id].inode_no = fileptr;
+	dir->filesize ++;
+	dir->last_modified = time(NULL);
+}
+
 int copy_pc2myfs(char* source, char* dest)
 {
 	SuperBlock * sb = (SuperBlock *)myfs;
@@ -111,11 +172,97 @@ int copy_pc2myfs(char* source, char* dest)
 	inl->node[inode_idx].access_permission[0] = 6;
 	inl->node[inode_idx].access_permission[1] = 6;
 	inl->node[inode_idx].access_permission[2] = 4;
-	
+
+	int no_of_blocks_req = no_of_blocks;
+
+	no_of_blocks -= NUM_DIRECT_POINTERS;
+	if(no_of_blocks > 0)
+	{
+		inl->node[inode_idx].indirect_pointer = get_dataBlock();
+		no_of_blocks -= BLOCKS_INDIRECT_PTR;
+	}
+	if(no_of_blocks > 0)
+	{
+		inl->node[inode_idx].doubly_indirect_pointer = get_dataBlock();
+		int *iptr = (int*)(myfs+DISKBLOCK_SIZE*inl->node[inode_idx].doubly_indirect_pointer);
+		int j = 0;
+		while(no_of_blocks > 0 && j<BLOCKS_INDIRECT_PTR)
+		{
+			*iptr = get_dataBlock();
+			iptr++;
+			j++;
+			no_of_blocks -= BLOCKS_INDIRECT_PTR;
+		}
+		if(no_of_blocks > 0)
+		{
+			cout<<"File size too big"<<endl;
+			return -1;
+		}
+	}
+
+	int idx = 0;
+	while(idx < no_of_blocks_req && idx < NUM_DIRECT_POINTERS)
+	{
+		if(file.eof()) break;
+		int db = get_dataBlock();
+		if(db == -1)
+		{
+			cout<<"Error getting free data block"<<endl;
+			return -1;
+		}
+
+		file.read(myfs + DISKBLOCK_SIZE*db, DISKBLOCK_SIZE);
+		inl->node[inode_idx].direct_pointers[idx] =  db;
+		idx++;
+	}
+	idx -= NUM_DIRECT_POINTERS;
+	no_of_blocks_req -= NUM_DIRECT_POINTERS;
+
+	int *iptr = (int*)(myfs+DISKBLOCK_SIZE*inl->node[inode_idx].indirect_pointer);
+	while(idx < no_of_blocks_req && idx < BLOCKS_INDIRECT_PTR)
+	{
+		if(file.eof()) break;
+		int db = get_dataBlock();
+		if(db==-1)
+		{
+			cout<<"Error getting free data block"<<endl;
+			return -1;
+		}
+		file.read(myfs + DISKBLOCK_SIZE*db, DISKBLOCK_SIZE);
+		*iptr = db;
+		idx++;
+		iptr++;
+	}
+	idx -= BLOCKS_INDIRECT_PTR;
+	no_of_blocks_req -= BLOCKS_INDIRECT_PTR;
 
 
+	int * diptr = (int*)(myfs+DISKBLOCK_SIZE*inl->node[inode_idx].doubly_indirect_pointer);
+	while(idx < no_of_blocks_req && idx < BLOCKS_DI_PTR)
+	{
+		int location_of_iptr = *diptr;
+		iptr = (int*)(myfs+DISKBLOCK_SIZE*location_of_iptr);
+		while(idx < no_of_blocks_req && idx < BLOCKS_INDIRECT_PTR)
+		{
+			if(file.eof()) break;
+			int db = get_dataBlock();
+			if(db == -1)
+			{
+				cout<<"Error getting free data block"<<endl;
+				return -1;
+			}
+			file.read(myfs+ DISKBLOCK_SIZE*db, DISKBLOCK_SIZE);
+			*iptr = db;
+			idx++;
+			iptr++;
+		}
+		diptr++;
+	} 
 
-
+	Inode * curr_dir_inode = &((InodeList *)(myfs + SUPERBLOCK_BYTES))->node[cur_dir];
+	enter_in_dir(curr_dir_inode, dest, inode_idx);
+	file.close();
+	return 0;
 }
 
 int main()
@@ -124,5 +271,8 @@ int main()
 	x = create_myfs(10);
 	if(x==-1) cout<<"Error"<<endl;
 	else cout<<x<<endl;
+
+	x = copy_pc2myfs("ayus.txt","myfile_new");
+	cout<<x<<endl;
 
 }

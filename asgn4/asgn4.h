@@ -22,6 +22,10 @@ struct SuperBlock{
 	bitset<MAX_INODES> free_inodes;
 };
 
+const int NUM_DIRECT_POINTERS = 8;
+const int BLOCKS_INDIRECT_PTR = 64;
+const int BLOCKS_DI_PTR = 4096;
+
 struct Inode{
 	bool filetype;
 	int filesize;
