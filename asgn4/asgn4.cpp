@@ -89,8 +89,8 @@ int* get_inode_ptr(Inode * inode, int idx)
 	}
 	idx -= BLOCKS_INDIRECT_PTR;
 	int ptr_idx = idx/BLOCKS_INDIRECT_PTR;
-	int* iptr = (int*)(myfs + DISKBLOCK_SIZE*inode->indirect_pointer + ptr_idx*4);
-	int* ptr = (int*)(myfs + DISKBLOCK_SIZE*(*iptr) + (idx%BLOCKS_INDIRECT_PTR)*4);
+	int* iptr = (int*)(myfs + DISKBLOCK_SIZE*(inode->doubly_indirect_pointer) + ptr_idx*4);
+	int* ptr = (int*)(myfs + DISKBLOCK_SIZE*(*iptr) + (idx%BLOCKS_INDIRECT_PTR)*4);	
 	return ptr;
 }
 
@@ -164,27 +164,29 @@ int copy_pc2myfs(char* source, char* dest)
 		cout<<"Error creating file: Unable to get new inode"<<endl;
 		return -1;
 	}
-	InodeList * inl = (InodeList *)(myfs + SUPERBLOCK_BLOCKS);
-	inl->node[inode_idx].filetype = 0;
-	inl->node[inode_idx].filesize = filesize;
-	inl->node[inode_idx].last_modified = time(NULL);
-	inl->node[inode_idx].last_read = time(NULL);
-	inl->node[inode_idx].access_permission[0] = 6;
-	inl->node[inode_idx].access_permission[1] = 6;
-	inl->node[inode_idx].access_permission[2] = 4;
+	//InodeList * inl = (InodeList *)(myfs + SUPERBLOCK_BLOCKS);
+	Inode* file_inode = &((InodeList*)(myfs+SUPERBLOCK_BYTES))->node[inode_idx];
+	//waste_inode->filesize = filesize;
+	file_inode->filetype = 0;
+	file_inode->filesize = filesize;
+	file_inode->last_modified = time(NULL);
+	file_inode->last_read = time(NULL);
+	file_inode->access_permission[0] = 6;
+	file_inode->access_permission[1] = 6;
+	file_inode->access_permission[2] = 4;
 
 	int no_of_blocks_req = no_of_blocks;
 
 	no_of_blocks -= NUM_DIRECT_POINTERS;
 	if(no_of_blocks > 0)
 	{
-		inl->node[inode_idx].indirect_pointer = get_dataBlock();
+		file_inode->indirect_pointer = get_dataBlock();
 		no_of_blocks -= BLOCKS_INDIRECT_PTR;
 	}
 	if(no_of_blocks > 0)
 	{
-		inl->node[inode_idx].doubly_indirect_pointer = get_dataBlock();
-		int *iptr = (int*)(myfs+DISKBLOCK_SIZE*inl->node[inode_idx].doubly_indirect_pointer);
+		file_inode->doubly_indirect_pointer = get_dataBlock();
+		int *iptr = (int*)(myfs+DISKBLOCK_SIZE*(file_inode->doubly_indirect_pointer));
 		int j = 0;
 		while(no_of_blocks > 0 && j<BLOCKS_INDIRECT_PTR)
 		{
@@ -212,13 +214,13 @@ int copy_pc2myfs(char* source, char* dest)
 		}
 
 		file.read(myfs + DISKBLOCK_SIZE*db, DISKBLOCK_SIZE);
-		inl->node[inode_idx].direct_pointers[idx] =  db;
+		file_inode->direct_pointers[idx] =  db;
 		idx++;
 	}
 	idx -= NUM_DIRECT_POINTERS;
 	no_of_blocks_req -= NUM_DIRECT_POINTERS;
 
-	int *iptr = (int*)(myfs+DISKBLOCK_SIZE*inl->node[inode_idx].indirect_pointer);
+	int *iptr = (int*)(myfs+DISKBLOCK_SIZE*(file_inode->indirect_pointer));
 	while(idx < no_of_blocks_req && idx < BLOCKS_INDIRECT_PTR)
 	{
 		if(file.eof()) break;
@@ -237,7 +239,7 @@ int copy_pc2myfs(char* source, char* dest)
 	no_of_blocks_req -= BLOCKS_INDIRECT_PTR;
 
 
-	int * diptr = (int*)(myfs+DISKBLOCK_SIZE*inl->node[inode_idx].doubly_indirect_pointer);
+	int * diptr = (int*)(myfs+DISKBLOCK_SIZE*(file_inode->doubly_indirect_pointer));
 	while(idx < no_of_blocks_req && idx < BLOCKS_DI_PTR)
 	{
 		int location_of_iptr = *diptr;
@@ -256,11 +258,63 @@ int copy_pc2myfs(char* source, char* dest)
 			idx++;
 			iptr++;
 		}
+		idx -= BLOCKS_INDIRECT_PTR;
+		no_of_blocks_req -= BLOCKS_INDIRECT_PTR;
 		diptr++;
 	} 
 
 	Inode * curr_dir_inode = &((InodeList *)(myfs + SUPERBLOCK_BYTES))->node[cur_dir];
 	enter_in_dir(curr_dir_inode, dest, inode_idx);
+	file.close();
+	return 0;
+}
+
+Inode * get_file_inode(Inode * dir_inode, char * filename)
+{
+	//Only for direct pointers
+	int ct = 0;
+	for(int i=0;i<NUM_DIRECT_POINTERS;i++)
+	{
+		if(ct >= dir_inode->filesize) break;
+		int directory_location = dir_inode->direct_pointers[i];
+		Directory * block = (Directory *) (myfs + DISKBLOCK_SIZE*directory_location);
+		for(int j=0;j<FILES_PER_DIR;j++)
+		{
+			if(ct >= dir_inode->filesize) break;
+			if(block->entry[j].inode_no != -1 && !strcmp(block->entry[i].filename,filename))
+			{
+				InodeList * list = (InodeList *)(myfs + SUPERBLOCK_BYTES);
+				return &(list->node[block->entry[j].inode_no]);
+			}
+			if(block->entry[j].inode_no != -1)
+				ct++;
+		}
+	}
+	return NULL;
+}
+
+
+int copy_myfs2pc(char* source, char* dest)
+{
+	ofstream file;
+	file.open(dest);
+	Inode * curr_dir_inode = &((InodeList *)(myfs + SUPERBLOCK_BYTES))->node[cur_dir];
+	Inode * file_inode = get_file_inode(curr_dir_inode, source);
+	if(file_inode == NULL){
+		cout<<"File Not Found"<<endl;
+		return -1;
+	}
+	//TO CONTINUE
+	int fsz = file_inode->filesize;
+	int idx = 0;
+	while(fsz > 0)
+	{
+		Block * b = (Block *)(myfs + DISKBLOCK_SIZE*(*get_inode_ptr(file_inode,idx)));
+		int sz_to_write = min(fsz, (int)sizeof(Block));
+		file.write((char *)b, sz_to_write);
+		fsz -= sz_to_write;
+		idx++;
+	}
 	file.close();
 	return 0;
 }
@@ -272,7 +326,9 @@ int main()
 	if(x==-1) cout<<"Error"<<endl;
 	else cout<<x<<endl;
 
-	x = copy_pc2myfs("ayus.txt","myfile_new");
+	x = copy_pc2myfs("water.jpg","myfile_new");
 	cout<<x<<endl;
+	int y = copy_myfs2pc("myfile_new","mywater.jpg");
+	cout<<y<<endl;
 
 }
