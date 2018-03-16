@@ -394,7 +394,7 @@ int rm_myfs(char * filename)
 		for(int j=0;j<FILES_PER_DIR;j++)
 		{
 			if(ct >= curr_dir_inode->filesize) break;
-			if(block->entry[j].inode_no != -1 && !strcmp(block->entry[i].filename,filename))
+			if(block->entry[j].inode_no != -1 && !strcmp(block->entry[j].filename,filename))
 			{
 				block->entry[j].inode_no = -1;
 				f = true;
@@ -477,6 +477,8 @@ int mkdir_myfs(char * dirname)
 	Inode * curr_dir_inode = &((InodeList *)(myfs + SUPERBLOCK_BYTES))->node[cur_dir];
 	enter_in_dir(curr_dir_inode, dirname, inode_idx);
 
+	enter_in_dir(file_inode,"..",cur_dir);
+
 	return 0;
 }
 
@@ -485,7 +487,7 @@ int chdir_myfs(char* dirname)
 	Inode * curr_dir_inode = &((InodeList *)(myfs + SUPERBLOCK_BYTES))->node[cur_dir];
 	Inode * new_dir_inode = get_file_inode(curr_dir_inode, dirname);
 	if(new_dir_inode == NULL){
-		cout<<"File Not Found"<<endl;
+		cout<<"Direcetory Not Found"<<endl;
 		return -1;
 	}	
 	if(new_dir_inode->filetype != 1)
@@ -495,7 +497,97 @@ int chdir_myfs(char* dirname)
 	}
 	int inode_idx = new_dir_inode - (Inode *)(myfs + SUPERBLOCK_BYTES);
 	cur_dir = inode_idx;
+	return 0;
 }
+
+int rmdir_myfs(char *dirname)
+{
+	Inode * curr_dir_inode = &((InodeList *)(myfs + SUPERBLOCK_BYTES))->node[cur_dir];
+	Inode * my_dir_inode = get_file_inode(curr_dir_inode, dirname);
+	if(my_dir_inode == NULL)
+	{
+		cout<<"Direcetory Not Found"<<endl;
+		return -1;
+	}
+	if(my_dir_inode->filetype != 1){
+		cout<<"Not a directory name"<<endl;
+		return -1;
+	}
+	//change to mydir
+	int prev_dir = cur_dir;
+	int inode_idx = my_dir_inode - (Inode *)(myfs + SUPERBLOCK_BYTES);
+	cur_dir = inode_idx;
+	for(int i=0;i<NUM_DIRECT_POINTERS;i++)
+	{
+		if(my_dir_inode->filesize == 1) break;
+		int directory_location = my_dir_inode->direct_pointers[i];
+		Directory * block = (Directory *) (myfs + DISKBLOCK_SIZE*directory_location);
+		for(int j=0;j<FILES_PER_DIR;j++)
+		{
+			if(my_dir_inode->filesize == 1) break;
+			if(block->entry[j].inode_no != -1)
+			{
+				//getinode, name
+				char * filename = block->entry[j].filename;
+				if(strcmp("..",filename) == 0) continue;
+				Inode * file_inode = get_file_inode(my_dir_inode, filename);
+				if(file_inode->filetype == 1)
+				{
+					cout<<"Removing Directory "<<filename<<endl;
+					rmdir_myfs(filename);
+				}
+				else
+				{
+					rm_myfs(filename);
+				}
+				
+			}
+		}
+	}
+
+	//change back to olddir
+	cur_dir = prev_dir;
+	for(int i=0;i<NUM_DIRECT_POINTERS;i++)
+	{
+		if(my_dir_inode->direct_pointers[i] != -1)
+		{
+			rm_diskBlock(my_dir_inode->direct_pointers[i]);
+		}
+	}
+
+	SuperBlock *sb = (SuperBlock *)(myfs);
+	sb->free_inodes[inode_idx] = 0;
+	sb->actual_inodes -= 1;
+
+	//Remove Entry from directory
+	int ct = 0;
+	bool f = false;
+	for(int i=0;i<NUM_DIRECT_POINTERS && !f;i++)
+	{
+		if(ct >= curr_dir_inode->filesize) break;
+		int directory_location = curr_dir_inode->direct_pointers[i];
+		Directory * block = (Directory *) (myfs + DISKBLOCK_SIZE*directory_location);
+		for(int j=0;j<FILES_PER_DIR;j++)
+		{
+			if(ct >= curr_dir_inode->filesize) break;
+			if(block->entry[j].inode_no != -1 && !strcmp(block->entry[j].filename,dirname))
+			{
+				block->entry[j].inode_no = -1;
+				f = true;
+				break;
+			}
+			if(block->entry[j].inode_no != -1)
+				ct++;
+		}
+	}
+	curr_dir_inode->filesize -= 1;
+
+	return 0;
+
+}
+
+
+
 
 int main()
 {
@@ -541,4 +633,11 @@ int main()
 	copy_pc2myfs("ayus.txt","myfile_new7");
 	cout<<"------"<<endl;
 	ls_myfs();
+	chdir_myfs("..");
+	cout<<"------"<<endl;
+	ls_myfs();
+	rmdir_myfs("mydir_ayush");
+	cout<<"-------"<<endl;
+	ls_myfs();
+
 }
