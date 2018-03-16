@@ -281,7 +281,7 @@ Inode * get_file_inode(Inode * dir_inode, char * filename)
 		for(int j=0;j<FILES_PER_DIR;j++)
 		{
 			if(ct >= dir_inode->filesize) break;
-			if(block->entry[j].inode_no != -1 && !strcmp(block->entry[i].filename,filename))
+			if(block->entry[j].inode_no != -1 && !strcmp(block->entry[j].filename,filename))
 			{
 				InodeList * list = (InodeList *)(myfs + SUPERBLOCK_BYTES);
 				return &(list->node[block->entry[j].inode_no]);
@@ -451,6 +451,52 @@ int ls_myfs()
 	return 0;
 }
 
+int mkdir_myfs(char * dirname)
+{
+	int inode_idx = get_inode();
+	if(inode_idx == -1)
+	{
+		cout<<"Error creating file: Unable to get new inode"<<endl;
+		return -1;
+	}
+	//InodeList * inl = (InodeList *)(myfs + SUPERBLOCK_BLOCKS);
+	Inode* file_inode = &((InodeList*)(myfs+SUPERBLOCK_BYTES))->node[inode_idx];
+	//waste_inode->filesize = filesize;
+	file_inode->filetype = 1;
+	file_inode->filesize = 0;
+	file_inode->last_modified = time(NULL);
+	file_inode->last_read = time(NULL);
+	file_inode->access_permission[0] = 6;
+	file_inode->access_permission[1] = 6;
+	file_inode->access_permission[2] = 6;
+	for(int i=0;i<8;i++)
+		file_inode->direct_pointers[i] = -1;
+	file_inode->indirect_pointer = -1;
+	file_inode->doubly_indirect_pointer = -1;
+
+	Inode * curr_dir_inode = &((InodeList *)(myfs + SUPERBLOCK_BYTES))->node[cur_dir];
+	enter_in_dir(curr_dir_inode, dirname, inode_idx);
+
+	return 0;
+}
+
+int chdir_myfs(char* dirname)
+{
+	Inode * curr_dir_inode = &((InodeList *)(myfs + SUPERBLOCK_BYTES))->node[cur_dir];
+	Inode * new_dir_inode = get_file_inode(curr_dir_inode, dirname);
+	if(new_dir_inode == NULL){
+		cout<<"File Not Found"<<endl;
+		return -1;
+	}	
+	if(new_dir_inode->filetype != 1)
+	{
+		cout<<"Not a directory name"<<endl;
+		return -1;
+	}
+	int inode_idx = new_dir_inode - (Inode *)(myfs + SUPERBLOCK_BYTES);
+	cur_dir = inode_idx;
+}
+
 int main()
 {
 	int x;
@@ -458,21 +504,41 @@ int main()
 	if(x==-1) cout<<"Error"<<endl;
 	else cout<<x<<endl;
 
+	cout<<"----"<<endl;
+	ls_myfs();
 	x = copy_pc2myfs("ayus.txt","myfile_new");
-	cout<<x<<endl;
+	cout<<"----"<<endl;
+	ls_myfs();
 	x = copy_pc2myfs("water.jpg","myfile_new2");
-	cout<<x<<endl;
+	cout<<"----"<<endl;
+	ls_myfs();
 	x = copy_pc2myfs("ayus.txt","myfile_new3");
-	cout<<x<<endl;
+	cout<<"----"<<endl;
+	ls_myfs();
 	x = copy_pc2myfs("ayus.txt","myfile_new4");
+	cout<<"----"<<endl;
+	ls_myfs();
+	x = copy_pc2myfs("ayus.txt","myfile_new5");
+	cout<<"----"<<endl;
+	ls_myfs();
+	//cout<<x<<e
 	//cout<<x<<endl;
 	//int y = copy_myfs2pc("myfile_new","mywater.jpg");
-	int y = ls_myfs();
 	/*cout<<y<<endl;
 	showfile_myfs("myfile_new");*/
-	int z = rm_myfs("myfile_new");
-	cout<<z<<endl;
-	y = copy_myfs2pc("myfile_new","mywater2.jpg");
-	cout<<y<<endl;
-
+	/*int z = rm_myfs("myfile_new");
+	cout<<"-----"<<endl;*/
+	mkdir_myfs("mydir_ayush");
+	cout<<"-------"<<endl;
+	ls_myfs();
+	/*x = copy_pc2myfs("ayus.txt","myfile_new6");
+	cout<<"------"<<endl;
+	ls_myfs();*/
+	cout<<"---"<<endl;
+	chdir_myfs("mydir_ayush");
+	cout<<"------"<<endl;
+	ls_myfs();
+	copy_pc2myfs("ayus.txt","myfile_new7");
+	cout<<"------"<<endl;
+	ls_myfs();
 }
