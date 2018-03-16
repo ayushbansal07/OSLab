@@ -304,7 +304,6 @@ int copy_myfs2pc(char* source, char* dest)
 		cout<<"File Not Found"<<endl;
 		return -1;
 	}
-	//TO CONTINUE
 	int fsz = file_inode->filesize;
 	int idx = 0;
 	while(fsz > 0)
@@ -319,6 +318,96 @@ int copy_myfs2pc(char* source, char* dest)
 	return 0;
 }
 
+void rm_diskBlock(int idx)
+{
+	//cout<<idx<<endl;
+	if(idx < SUPERBLOCK_BLOCKS + INODE_LIST_BLOCKS)
+	{
+		//cout<<"Error Trying to remove Non-data space"<<endl;
+		return;
+	}
+	SuperBlock * sb = (SuperBlock *)(myfs);
+	sb->actual_diskBlocks -= 1;
+	sb->free_diskBlocks[idx] = 0;
+}
+
+int rm_myfs(char * filename)
+{
+	Inode * curr_dir_inode = &((InodeList *)(myfs + SUPERBLOCK_BYTES))->node[cur_dir];
+	Inode * file_inode = get_file_inode(curr_dir_inode, filename);
+	if(file_inode == NULL){
+		cout<<"File Not Found"<<endl;
+		return -1;
+	}
+	int fsz = file_inode->filesize;
+	int idx = 0;
+	while(fsz > 0 && idx < NUM_DIRECT_POINTERS + BLOCKS_INDIRECT_PTR)
+	{
+		int block = *get_inode_ptr(file_inode,idx);			
+		rm_diskBlock(block);
+		fsz -= DISKBLOCK_SIZE;
+		idx++;
+	}
+	if(file_inode->indirect_pointer != -1)
+	{
+		rm_diskBlock(file_inode->indirect_pointer);
+	}
+	while(fsz > 0 && idx < NUM_DIRECT_POINTERS + BLOCKS_INDIRECT_PTR + BLOCKS_DI_PTR)
+	{
+		int block = *get_inode_ptr(file_inode,idx);
+		rm_diskBlock(block);
+		fsz -= DISKBLOCK_SIZE;
+		idx++;
+	}
+	if(file_inode->doubly_indirect_pointer != -1)
+	{
+		int * diptr = (int *)(myfs + DISKBLOCK_SIZE*(file_inode->doubly_indirect_pointer));
+		int num_ptrs = 0;
+		while(num_ptrs < BLOCKS_INDIRECT_PTR)
+		{
+			if(*diptr > 0)
+			{
+				rm_diskBlock(*diptr);
+			}
+			else
+			{
+				break;
+			}
+			diptr++;
+		}		
+		rm_diskBlock(file_inode->doubly_indirect_pointer);
+	}
+
+	SuperBlock * sb = (SuperBlock *)myfs;
+	int inode_idx = file_inode - (Inode *)(myfs + SUPERBLOCK_BYTES);
+	sb->actual_inodes -= 1;
+	sb->free_inodes[inode_idx] = 0;
+
+	//TODO:Remove directory from entry
+	int ct = 0;
+	bool f = false;
+	for(int i=0;i<NUM_DIRECT_POINTERS && !f;i++)
+	{
+		if(ct >= curr_dir_inode->filesize) break;
+		int directory_location = curr_dir_inode->direct_pointers[i];
+		Directory * block = (Directory *) (myfs + DISKBLOCK_SIZE*directory_location);
+		for(int j=0;j<FILES_PER_DIR;j++)
+		{
+			if(ct >= curr_dir_inode->filesize) break;
+			if(block->entry[j].inode_no != -1 && !strcmp(block->entry[i].filename,filename))
+			{
+				block->entry[j].inode_no = -1;
+				f = true;
+				break;
+			}
+			if(block->entry[j].inode_no != -1)
+				ct++;
+		}
+	}
+	curr_dir_inode->filesize -= 1;
+	return 0;
+}
+
 int main()
 {
 	int x;
@@ -329,6 +418,10 @@ int main()
 	x = copy_pc2myfs("water.jpg","myfile_new");
 	cout<<x<<endl;
 	int y = copy_myfs2pc("myfile_new","mywater.jpg");
+	cout<<y<<endl;
+	int z = rm_myfs("myfile_new");
+	cout<<z<<endl;
+	y = copy_myfs2pc("myfile_new","mywater2.jpg");
 	cout<<y<<endl;
 
 }
