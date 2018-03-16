@@ -408,6 +408,49 @@ int rm_myfs(char * filename)
 	return 0;
 }
 
+int showfile_myfs(char *filename)
+{
+	Inode * curr_dir_inode = &((InodeList *)(myfs + SUPERBLOCK_BYTES))->node[cur_dir];
+	Inode * file_inode = get_file_inode(curr_dir_inode, filename);
+	if(file_inode == NULL){
+		cout<<"File Not Found"<<endl;
+		return -1;
+	}
+	int fsz = file_inode->filesize;
+	int idx = 0;
+	while(fsz > 0)
+	{
+		int block = *get_inode_ptr(file_inode,idx);	
+		Block * b = (Block *) (myfs + DISKBLOCK_SIZE*block);
+		cout<<(char *)b;
+		fsz -= DISKBLOCK_SIZE;
+		idx++;
+	}
+	return 0;
+}
+
+int ls_myfs()
+{
+	Inode * dir_inode = &((InodeList *)(myfs + SUPERBLOCK_BYTES))->node[cur_dir];
+	int ct = 0;
+	for(int i=0;i<NUM_DIRECT_POINTERS;i++)
+	{
+		if(ct >= dir_inode->filesize) break;
+		int directory_location = dir_inode->direct_pointers[i];
+		Directory * block = (Directory *) (myfs + DISKBLOCK_SIZE*directory_location);
+		for(int j=0;j<FILES_PER_DIR;j++)
+		{
+			if(ct >= dir_inode->filesize) break;
+			if(block->entry[j].inode_no != -1)
+			{
+				cout<<block->entry[j].filename<<endl;
+				ct++;
+			}
+		}
+	}
+	return 0;
+}
+
 int main()
 {
 	int x;
@@ -415,10 +458,18 @@ int main()
 	if(x==-1) cout<<"Error"<<endl;
 	else cout<<x<<endl;
 
-	x = copy_pc2myfs("water.jpg","myfile_new");
+	x = copy_pc2myfs("ayus.txt","myfile_new");
 	cout<<x<<endl;
-	int y = copy_myfs2pc("myfile_new","mywater.jpg");
-	cout<<y<<endl;
+	x = copy_pc2myfs("water.jpg","myfile_new2");
+	cout<<x<<endl;
+	x = copy_pc2myfs("ayus.txt","myfile_new3");
+	cout<<x<<endl;
+	x = copy_pc2myfs("ayus.txt","myfile_new4");
+	//cout<<x<<endl;
+	//int y = copy_myfs2pc("myfile_new","mywater.jpg");
+	int y = ls_myfs();
+	/*cout<<y<<endl;
+	showfile_myfs("myfile_new");*/
 	int z = rm_myfs("myfile_new");
 	cout<<z<<endl;
 	y = copy_myfs2pc("myfile_new","mywater2.jpg");
