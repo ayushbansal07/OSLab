@@ -649,6 +649,87 @@ int close_myfs(int fd)
 
 
 //TODO: read and write
+int read_myfs(int fd, int nbytes, char *buff)
+{
+	if(fd_table.entry[fd].mode == 'w')
+	{
+		cout<<"Error file opened in Read Mode"<<endl;
+		return -1;
+	}
+	int * loc = &fd_table.entry[fd].offset;
+	int idx = *loc/DISKBLOCK_SIZE;
+	int init_offset = *loc%DISKBLOCK_SIZE;
+	int read = 0;
+	int fsz = fd_table.entry[fd].inode->filesize - *loc;
+	if(init_offset)
+	{
+		int to_copy = min(min(nbytes,fsz),DISKBLOCK_SIZE - init_offset);
+		memcpy(buff,myfs + DISKBLOCK_SIZE*(*get_inode_ptr(fd_table.entry[fd].inode,idx)) + init_offset, to_copy);
+		read += to_copy;
+		nbytes -= to_copy;
+		fsz -= to_copy;
+		idx++;
+	}
+	while(nbytes && fsz)
+	{
+		int to_copy = min(min(nbytes,fsz),DISKBLOCK_SIZE);
+		memcpy(buff + read, myfs + DISKBLOCK_SIZE * (*get_inode_ptr(fd_table.entry[fd].inode, idx)), to_copy);
+		read += to_copy;
+		nbytes -= to_copy;
+		fsz -= to_copy;
+		idx++;
+	}
+	*loc += read;
+	fd_table.entry[fd].inode->last_read = time(NULL);
+	return read;
+}
+
+int write_myfs(int fd, int nbytes, char *buff)
+{
+	if(fd_table.entry[fd].mode == 'r')
+	{
+		cout<<"Error file opened in Write Mode"<<endl;
+		return -1;
+	}
+	int * loc = &fd_table.entry[fd].offset;
+	int idx = *loc/DISKBLOCK_SIZE;
+	int init_offset = *loc%DISKBLOCK_SIZE;
+	int written = 0;
+	if(init_offset)
+	{
+		int to_write = min(nbytes, DISKBLOCK_SIZE - init_offset);
+		memcpy(myfs + DISKBLOCK_SIZE * (*get_inode_ptr(fd_table.entry[fd].inode,idx)) + init_offset, buff, to_write);
+		written += to_write;
+		nbytes -= to_write;
+		idx++;
+	}
+	while(nbytes)
+	{
+		int to_write = min(nbytes, DISKBLOCK_SIZE);
+		if(idx == NUM_DIRECT_POINTERS)
+			fd_table.entry[fd].inode->indirect_pointer = get_dataBlock();
+		if(idx == NUM_DIRECT_POINTERS + BLOCKS_INDIRECT_PTR)
+			fd_table.entry[fd].inode->doubly_indirect_pointer = get_dataBlock();
+		if(idx >= NUM_DIRECT_POINTERS + BLOCKS_INDIRECT_PTR)
+		{
+			if(idx - (NUM_DIRECT_POINTERS + BLOCKS_INDIRECT_PTR)%BLOCKS_INDIRECT_PTR==0)
+			{
+				*(int*)(myfs + DISKBLOCK_SIZE*fd_table.entry[fd].inode->doubly_indirect_pointer + 4*(idx - (NUM_DIRECT_POINTERS + BLOCKS_INDIRECT_PTR))/BLOCKS_INDIRECT_PTR) = get_dataBlock();
+			}
+		}
+		int *ind = get_inode_ptr(fd_table.entry[fd].inode,idx);
+		*ind = get_dataBlock();
+		memcpy(myfs + DISKBLOCK_SIZE*(*ind), buff + written,to_write);
+		written += to_write;
+		nbytes -= to_write;
+		idx++;
+	}
+	*loc += written;
+	fd_table.entry[fd].inode->filesize += written;
+	fd_table.entry[fd].inode->last_read = time(NULL);
+	fd_table.entry[fd].inode->last_modified = time(NULL);
+	return written;
+}
 
 int eof_myfs(int fd)
 {
@@ -663,16 +744,19 @@ int dump_myfs(char *dumpfile)
 	int sz = ((SuperBlock *)myfs)->total_sz;
 	file.write(myfs,sz);
 	file.close();
+	return 0;
 }
 
 int restore_myfs(char *dumpfile)
 {
 	ifstream file;
+	file.open(dumpfile);
 	file.seekg(0, ios::end);
 	int sz = file.tellg();
 	file.seekg(0,ios::beg);
 	file.read(myfs,sz);
 	file.close();
+	return sz;
 }
 
 int status_myfs()
@@ -693,7 +777,7 @@ int chmod_myfs(char *name, int mode)
 
 
 
-int main()
+/*int main()
 {
 	int x;
 	x = create_myfs(10);
@@ -719,20 +803,10 @@ int main()
 	x = copy_pc2myfs("ayus.txt","myfile_new5");
 	cout<<"----"<<endl;
 	ls_myfs();
-	//cout<<x<<e
-	//cout<<x<<endl;
-	//int y = copy_myfs2pc("myfile_new","mywater.jpg");
-	/*cout<<y<<endl;
-	showfile_myfs("myfile_new");*/
-	/*int z = rm_myfs("myfile_new");
-	cout<<"-----"<<endl;*/
 	mkdir_myfs("mydir_ayush");
 	cout<<"-------"<<endl;
 	ls_myfs();
-	/*x = copy_pc2myfs("ayus.txt","myfile_new6");
-	cout<<"------"<<endl;
 
-	ls_myfs();*/
 	cout<<"---"<<endl;
 	chdir_myfs("mydir_ayush");
 	cout<<"------"<<endl;
@@ -758,5 +832,9 @@ int main()
 	ls_myfs();
 	int fd4 = open_myfs("myfile_new2",'r');
 	cout<<fd4<<endl;
+	cout<<close_myfs(fd4)<<endl;
+	cout<<dump_myfs("mydump")<<endl;
+	cout<<restore_myfs("mydump")<<endl;
+
 	
-}
+}*/
