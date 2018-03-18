@@ -66,8 +66,20 @@ struct Directory{
 	DirectoryEntry entry[FILES_PER_DIR];
 };
 
+struct FDEntry{
+	int offset;
+	Inode * inode;
+	char mode;
+};
+
+#define MAX_FDTABLE_SIZE 64
+struct FDTable{
+	FDEntry entry[MAX_FDTABLE_SIZE];
+};
+
 extern char* myfs;
 extern int cur_dir;
+extern FDTable fd_table;
 
 int create_myfs(int size);
 

@@ -13,6 +13,7 @@ using namespace std;
 
 char* myfs;
 int cur_dir;
+FDTable fd_table;
 
 void init_dir(Directory* dir)
 {
@@ -65,7 +66,7 @@ int create_myfs(int size)
 int get_inode()
 {
 	SuperBlock * sb = (SuperBlock *)myfs;
-	for(int i=0;i<MAX_INODES;i++)
+	for(int i=1;i<MAX_INODES;i++)
 	{
 		if(sb->free_inodes[i] == 0)
 		{
@@ -380,8 +381,8 @@ int rm_myfs(char * filename)
 
 	SuperBlock * sb = (SuperBlock *)myfs;
 	int inode_idx = file_inode - (Inode *)(myfs + SUPERBLOCK_BYTES);
-	sb->actual_inodes -= 1;
 	sb->free_inodes[inode_idx] = 0;
+	sb->actual_inodes -= 1;
 
 	//TODO:Remove directory from entry
 	int ct = 0;
@@ -524,7 +525,13 @@ int rmdir_myfs(char *dirname)
 		Directory * block = (Directory *) (myfs + DISKBLOCK_SIZE*directory_location);
 		for(int j=0;j<FILES_PER_DIR;j++)
 		{
-			if(my_dir_inode->filesize == 1) break;
+			if(cur_dir == 0){
+				if(my_dir_inode->filesize ==0) break;
+			}
+			else{
+				if(my_dir_inode->filesize == 1) break;
+			}
+			
 			if(block->entry[j].inode_no != -1)
 			{
 				//getinode, name
@@ -544,7 +551,6 @@ int rmdir_myfs(char *dirname)
 			}
 		}
 	}
-
 	//change back to olddir
 	cur_dir = prev_dir;
 	for(int i=0;i<NUM_DIRECT_POINTERS;i++)
@@ -586,6 +592,104 @@ int rmdir_myfs(char *dirname)
 
 }
 
+int open_myfs(char *filename, char mode)
+{
+	int idx = 0;
+	for(;idx < MAX_FDTABLE_SIZE;idx++)
+	{
+		if(fd_table.entry[idx].inode == NULL) break;
+	}
+	if(idx == MAX_FDTABLE_SIZE){
+		cout<<"Error: FDTable full"<<endl;
+		return -1;
+	}
+	Inode * curr_dir_inode = &((InodeList *)(myfs + SUPERBLOCK_BYTES))->node[cur_dir];
+	Inode * file_inode = get_file_inode(curr_dir_inode, filename);
+	if(file_inode == NULL)
+	{
+		if(mode == 'r'){
+			cout<<"FIle does not Exist, unable to open"<<endl;
+			return -1;
+		}	
+		else if(mode == 'w')
+		{
+			int inode_idx = get_inode();
+			file_inode = &(((InodeList *)(myfs + SUPERBLOCK_BYTES))->node[inode_idx]);
+			file_inode->filetype = 0;
+			file_inode->filesize = 0;
+			file_inode->last_modified = time(NULL);
+			file_inode->last_read = time(NULL);
+			file_inode->access_permission[0] = 6;
+			file_inode->access_permission[1] = 6;
+			file_inode->access_permission[2] = 6;
+
+			enter_in_dir(curr_dir_inode,filename,inode_idx);
+		}
+
+		else
+		{
+			cout<<"Invalid mode"<<endl;
+			return -1;
+		}
+	}
+
+	fd_table.entry[idx].offset = 0;
+	fd_table.entry[idx].inode = file_inode;
+	fd_table.entry[idx].mode = mode;
+
+	return idx;
+}
+
+int close_myfs(int fd)
+{
+	if(fd_table.entry[fd].inode == NULL) return -1;
+	fd_table.entry[fd].inode = NULL;
+	return 0;
+}
+
+
+//TODO: read and write
+
+int eof_myfs(int fd)
+{
+	if(fd_table.entry[fd].offset == fd_table.entry[fd].inode->filesize) return true;
+	return false;
+}
+
+int dump_myfs(char *dumpfile)
+{
+	ofstream file;	
+	file.open(dumpfile);
+	int sz = ((SuperBlock *)myfs)->total_sz;
+	file.write(myfs,sz);
+	file.close();
+}
+
+int restore_myfs(char *dumpfile)
+{
+	ifstream file;
+	file.seekg(0, ios::end);
+	int sz = file.tellg();
+	file.seekg(0,ios::beg);
+	file.read(myfs,sz);
+	file.close();
+}
+
+int status_myfs()
+{
+	SuperBlock * sb = (SuperBlock *)myfs;
+	cout<<"Size of FS = "<<sb->total_sz<<endl;
+	int free_space = (sb->max_diskBlocks - sb->actual_diskBlocks)*DISKBLOCK_SIZE;
+	cout<<"Free Space = "<<free_space<<endl;
+	cout<<"Occupied Space = "<<(sb->total_sz - free_space)<<endl;
+	cout<<"Number of files =  "<<sb->actual_inodes<<endl;
+}
+
+int chmod_myfs(char *name, int mode)
+{
+	//TODO
+}
+
 
 
 
@@ -595,6 +699,8 @@ int main()
 	x = create_myfs(10);
 	if(x==-1) cout<<"Error"<<endl;
 	else cout<<x<<endl;
+
+
 
 	cout<<"----"<<endl;
 	ls_myfs();
@@ -625,6 +731,7 @@ int main()
 	ls_myfs();
 	/*x = copy_pc2myfs("ayus.txt","myfile_new6");
 	cout<<"------"<<endl;
+
 	ls_myfs();*/
 	cout<<"---"<<endl;
 	chdir_myfs("mydir_ayush");
@@ -639,5 +746,17 @@ int main()
 	rmdir_myfs("mydir_ayush");
 	cout<<"-------"<<endl;
 	ls_myfs();
-
+	cout<<"__________________"<<endl;
+	int fd = open_myfs("myfile_new3",'r');
+	cout<<fd<<endl;
+	
+	int fd3 = open_myfs("myfile_new3",'r');
+	cout<<fd3<<endl;
+	int fd2 = open_myfs("nkfej",'w');
+	cout<<fd2<<endl;
+	cout<<"-------"<<endl;
+	ls_myfs();
+	int fd4 = open_myfs("myfile_new2",'r');
+	cout<<fd4<<endl;
+	
 }
