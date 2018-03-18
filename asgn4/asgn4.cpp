@@ -769,11 +769,20 @@ int status_myfs()
 	cout<<"Number of files =  "<<sb->actual_inodes<<endl;
 }
 
-int chmod_myfs(char *name, int mode)
-{
-	//TODO
-}
+int chmod_myfs(char* name, int mode){
+	Inode * curr_dir_inode = &((InodeList *)(myfs + SUPERBLOCK_BYTES))->node[cur_dir];
+	Inode * file_indoe = get_file_inode(curr_dir_inode, name);
+	if(file_indoe == NULL)
+	{
+		cout<<"File DOES NOT EXIST"<<endl;
+		return -1;
+	}
+	file_inode->access_permission[0] = (mode>>6)%8;
+	file_inode->access_permission[1] = (mode>>3)%8;
+	file_inode->access_permission[2] = (mode)%8;
 
+	return 0;
+}
 
 
 
