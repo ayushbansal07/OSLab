@@ -771,8 +771,8 @@ int status_myfs()
 
 int chmod_myfs(char* name, int mode){
 	Inode * curr_dir_inode = &((InodeList *)(myfs + SUPERBLOCK_BYTES))->node[cur_dir];
-	Inode * file_indoe = get_file_inode(curr_dir_inode, name);
-	if(file_indoe == NULL)
+	Inode * file_inode = get_file_inode(curr_dir_inode, name);
+	if(file_inode == NULL)
 	{
 		cout<<"File DOES NOT EXIST"<<endl;
 		return -1;
