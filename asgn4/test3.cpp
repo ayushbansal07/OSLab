@@ -29,5 +29,8 @@ int main()
 	}
 	cout<<endl;
 
+	free_myfs();
+	return 0;
+
 
 }

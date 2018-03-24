@@ -65,6 +65,8 @@ int main()
 	if (x!=-1)
 		cout<<"Delete Sucessful\n"<<endl;
 	ls_myfs();
+
+	free_myfs();
 	
 	return 0;
 	

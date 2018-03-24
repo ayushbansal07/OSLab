@@ -68,6 +68,8 @@ int main()
 	ls_myfs();
 	
 	x = dump_myfs("mydump-33.backup");
+
+	free_myfs();
 	return 0;
 	
 }

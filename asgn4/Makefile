@@ -6,16 +6,16 @@ libmyfs.a: asgn4.h asgn4.cpp
 	rm asgn4.o
 
 test1: test1.cpp libmyfs.a
-	g++ -Wall test1.cpp libmyfs.a -o test1
+	g++ -Wall test1.cpp libmyfs.a -o test1 -lpthread
 
 test2: test2.cpp libmyfs.a
-	g++ -Wall test2.cpp libmyfs.a -o test2
+	g++ -Wall test2.cpp libmyfs.a -o test2 -lpthread
 
 test3: test3.cpp libmyfs.a
-	g++ -Wall test3.cpp libmyfs.a -o test3
+	g++ -Wall test3.cpp libmyfs.a -o test3 -lpthread
 
 test4: test4.cpp libmyfs.a
-	g++ -Wall test4.cpp libmyfs.a -o test4
+	g++ -Wall test4.cpp libmyfs.a -o test4 -lpthread
 
 clean:
-	rm libmrfs.a test1 test2 test3 test4
+	rm libmyfs.a test1 test2 test3 test4

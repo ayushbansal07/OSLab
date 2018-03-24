@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <fstream>
 #include <string.h>
+#include <semaphore.h>
+#include <sys/shm.h>
 
 #define MBtoB 1048576
 
@@ -14,6 +16,8 @@ using namespace std;
 char* myfs;
 int cur_dir;
 FDTable fd_table;
+sem_t fd_mutex, cd_mutex, mem_mutex;
+int shmid;
 
 void init_dir(Directory* dir)
 {
@@ -23,11 +27,28 @@ void init_dir(Directory* dir)
 	}
 }
 
+void init_fdTable(){
+	sem_wait(&fd_mutex);
+	for(int i=0;i<MAX_FDTABLE_SIZE;i++){
+		fd_table.entry[i].inode = NULL;
+	}
+	sem_post(&fd_mutex);
+}
+
 int create_myfs(int size)
 {
 	if(size > MAX_ALLOCATED_SIZE) return -1;
 	if(size*MBtoB < SUPERBLOCK_SIZE + INODE_LIST_BYTES) return -1;
-	myfs = new char[size*MBtoB];
+	sem_init(&fd_mutex, 0, 1);
+	sem_init(&cd_mutex, 0, 1);
+	sem_init(&mem_mutex, 0, 1);
+
+	sem_wait(&mem_mutex);
+	//myfs = new char[size*MBtoB];
+	int key = 1234;
+	shmid = shmget(key,size*MBtoB*sizeof(char),IPC_CREAT | 0666);
+	if(shmid < 0) cout<<"Error in shmget"<<endl;
+	myfs = (char *) shmat(shmid,NULL,0);
 	//Initialise Super Block
 	SuperBlock* sb = (SuperBlock *) myfs;
 	sb->total_sz = size * MBtoB;
@@ -58,7 +79,9 @@ int create_myfs(int size)
 	//Initialise root directory
 	Directory* root_block = (Directory *)(myfs +SUPERBLOCK_BYTES + INODE_LIST_BYTES);
 	init_dir(root_block);
+	init_fdTable();
 
+	sem_post(&mem_mutex);
 	return size;
 }
 
@@ -165,6 +188,7 @@ int copy_pc2myfs(char* source, char* dest)
 		cout<<"Error creating file: Unable to get new inode"<<endl;
 		return -1;
 	}
+	sem_wait(&mem_mutex);
 	//InodeList * inl = (InodeList *)(myfs + SUPERBLOCK_BLOCKS);
 	Inode* file_inode = &((InodeList*)(myfs+SUPERBLOCK_BYTES))->node[inode_idx];
 	//waste_inode->filesize = filesize;
@@ -267,6 +291,7 @@ int copy_pc2myfs(char* source, char* dest)
 	Inode * curr_dir_inode = &((InodeList *)(myfs + SUPERBLOCK_BYTES))->node[cur_dir];
 	enter_in_dir(curr_dir_inode, dest, inode_idx);
 	file.close();
+	sem_post(&mem_mutex);
 	return 0;
 }
 
@@ -305,6 +330,7 @@ int copy_myfs2pc(char* source, char* dest)
 		cout<<"File Not Found"<<endl;
 		return -1;
 	}
+	sem_wait(&mem_mutex);
 	int fsz = file_inode->filesize;
 	int idx = 0;
 	while(fsz > 0)
@@ -316,6 +342,7 @@ int copy_myfs2pc(char* source, char* dest)
 		idx++;
 	}
 	file.close();
+	sem_post(&mem_mutex);
 	return 0;
 }
 
@@ -340,6 +367,7 @@ int rm_myfs(char * filename)
 		cout<<"File Not Found"<<endl;
 		return -1;
 	}
+	sem_wait(&mem_mutex);
 	int fsz = file_inode->filesize;
 	int idx = 0;
 	while(fsz > 0 && idx < NUM_DIRECT_POINTERS + BLOCKS_INDIRECT_PTR)
@@ -406,6 +434,7 @@ int rm_myfs(char * filename)
 		}
 	}
 	curr_dir_inode->filesize -= 1;
+	sem_post(&mem_mutex);
 	return 0;
 }
 
@@ -417,6 +446,7 @@ int showfile_myfs(char *filename)
 		cout<<"File Not Found"<<endl;
 		return -1;
 	}
+	sem_wait(&mem_mutex);
 	int fsz = file_inode->filesize;
 	int idx = 0;
 	while(fsz > 0)
@@ -427,11 +457,13 @@ int showfile_myfs(char *filename)
 		fsz -= DISKBLOCK_SIZE;
 		idx++;
 	}
+	sem_post(&mem_mutex);
 	return 0;
 }
 
 int ls_myfs()
 {
+	sem_wait(&mem_mutex);
 	Inode * dir_inode = &((InodeList *)(myfs + SUPERBLOCK_BYTES))->node[cur_dir];
 	int ct = 0;
 	for(int i=0;i<NUM_DIRECT_POINTERS;i++)
@@ -449,6 +481,7 @@ int ls_myfs()
 			}
 		}
 	}
+	sem_post(&mem_mutex);
 	return 0;
 }
 
@@ -460,6 +493,7 @@ int mkdir_myfs(char * dirname)
 		cout<<"Error creating file: Unable to get new inode"<<endl;
 		return -1;
 	}
+	sem_wait(&mem_mutex);
 	//InodeList * inl = (InodeList *)(myfs + SUPERBLOCK_BLOCKS);
 	Inode* file_inode = &((InodeList*)(myfs+SUPERBLOCK_BYTES))->node[inode_idx];
 	//waste_inode->filesize = filesize;
@@ -480,6 +514,7 @@ int mkdir_myfs(char * dirname)
 
 	enter_in_dir(file_inode,"..",cur_dir);
 
+	sem_post(&mem_mutex);
 	return 0;
 }
 
@@ -497,7 +532,9 @@ int chdir_myfs(char* dirname)
 		return -1;
 	}
 	int inode_idx = new_dir_inode - (Inode *)(myfs + SUPERBLOCK_BYTES);
+	sem_wait(&cd_mutex);
 	cur_dir = inode_idx;
+	sem_post(&cd_mutex);
 	return 0;
 }
 
@@ -603,6 +640,7 @@ int open_myfs(char *filename, char mode)
 		cout<<"Error: FDTable full"<<endl;
 		return -1;
 	}
+	sem_wait(&fd_mutex);
 	Inode * curr_dir_inode = &((InodeList *)(myfs + SUPERBLOCK_BYTES))->node[cur_dir];
 	Inode * file_inode = get_file_inode(curr_dir_inode, filename);
 	if(file_inode == NULL)
@@ -632,18 +670,42 @@ int open_myfs(char *filename, char mode)
 			return -1;
 		}
 	}
+	else
+	{
+		if(mode == 'w')
+		{
+			sem_post(&fd_mutex);
+			rm_myfs(filename);
+			sem_wait(&fd_mutex);
+
+			int inode_idx = get_inode();
+			file_inode = &(((InodeList *)(myfs + SUPERBLOCK_BYTES))->node[inode_idx]);
+			file_inode->filetype = 0;
+			file_inode->filesize = 0;
+			file_inode->last_modified = time(NULL);
+			file_inode->last_read = time(NULL);
+			file_inode->access_permission[0] = 6;
+			file_inode->access_permission[1] = 6;
+			file_inode->access_permission[2] = 6;
+
+			enter_in_dir(curr_dir_inode,filename,inode_idx);
+		}
+	}
 
 	fd_table.entry[idx].offset = 0;
 	fd_table.entry[idx].inode = file_inode;
 	fd_table.entry[idx].mode = mode;
 
+	sem_post(&fd_mutex);
 	return idx;
 }
 
 int close_myfs(int fd)
 {
 	if(fd_table.entry[fd].inode == NULL) return -1;
+	sem_wait(&fd_mutex);
 	fd_table.entry[fd].inode = NULL;
+	sem_post(&fd_mutex);
 	return 0;
 }
 
@@ -656,6 +718,8 @@ int read_myfs(int fd, int nbytes, char *buff)
 		cout<<"Error file opened in Read Mode"<<endl;
 		return -1;
 	}
+	sem_wait(&fd_mutex);
+	sem_wait(&mem_mutex);
 	int * loc = &fd_table.entry[fd].offset;
 	int idx = *loc/DISKBLOCK_SIZE;
 	int init_offset = *loc%DISKBLOCK_SIZE;
@@ -681,6 +745,8 @@ int read_myfs(int fd, int nbytes, char *buff)
 	}
 	*loc += read;
 	fd_table.entry[fd].inode->last_read = time(NULL);
+	sem_post(&fd_mutex);
+	sem_post(&mem_mutex);
 	return read;
 }
 
@@ -691,6 +757,8 @@ int write_myfs(int fd, int nbytes, char *buff)
 		cout<<"Error file opened in Write Mode"<<endl;
 		return -1;
 	}
+	sem_wait(&fd_mutex);
+	sem_wait(&mem_mutex);
 	int * loc = &fd_table.entry[fd].offset;
 	int idx = *loc/DISKBLOCK_SIZE;
 	int init_offset = *loc%DISKBLOCK_SIZE;
@@ -728,6 +796,8 @@ int write_myfs(int fd, int nbytes, char *buff)
 	fd_table.entry[fd].inode->filesize += written;
 	fd_table.entry[fd].inode->last_read = time(NULL);
 	fd_table.entry[fd].inode->last_modified = time(NULL);
+	sem_post(&fd_mutex);
+	sem_post(&mem_mutex);
 	return written;
 }
 
@@ -741,9 +811,11 @@ int dump_myfs(char *dumpfile)
 {
 	ofstream file;	
 	file.open(dumpfile);
+	sem_wait(&mem_mutex);
 	int sz = ((SuperBlock *)myfs)->total_sz;
 	file.write(myfs,sz);
 	file.close();
+	sem_post(&mem_mutex);
 	return 0;
 }
 
@@ -754,19 +826,32 @@ int restore_myfs(char *dumpfile)
 	file.seekg(0, ios::end);
 	int sz = file.tellg();
 	file.seekg(0,ios::beg);
+
+	sem_init(&fd_mutex, 0, 1);
+	sem_init(&cd_mutex, 0, 1);
+	sem_init(&mem_mutex, 0, 1);
+
+	sem_wait(&mem_mutex);
 	file.read(myfs,sz);
+	cur_dir = 0;
+	init_fdTable();
+	sem_post(&mem_mutex);
+
 	file.close();
 	return sz;
 }
 
 int status_myfs()
 {
+	sem_wait(&mem_mutex);
 	SuperBlock * sb = (SuperBlock *)myfs;
 	cout<<"Size of FS = "<<sb->total_sz<<endl;
 	int free_space = (sb->max_diskBlocks - sb->actual_diskBlocks)*DISKBLOCK_SIZE;
 	cout<<"Free Space = "<<free_space<<endl;
 	cout<<"Occupied Space = "<<(sb->total_sz - free_space)<<endl;
 	cout<<"Number of files =  "<<sb->actual_inodes<<endl;
+	sem_post(&mem_mutex);
+	return 0;
 }
 
 int chmod_myfs(char* name, int mode){
@@ -777,10 +862,18 @@ int chmod_myfs(char* name, int mode){
 		cout<<"File DOES NOT EXIST"<<endl;
 		return -1;
 	}
+	sem_wait(&mem_mutex);
 	file_inode->access_permission[0] = (mode>>6)%8;
 	file_inode->access_permission[1] = (mode>>3)%8;
 	file_inode->access_permission[2] = (mode)%8;
+	sem_post(&mem_mutex);
+	return 0;
+}
 
+int free_myfs()
+{
+	shmdt(myfs);
+	shmctl(shmid,IPC_RMID,NULL);
 	return 0;
 }
 

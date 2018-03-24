@@ -80,6 +80,7 @@ struct FDTable{
 extern char* myfs;
 extern int cur_dir;
 extern FDTable fd_table;
+extern int shmid;
 
 int create_myfs(int size);
 
@@ -116,5 +117,7 @@ int restore_myfs(char *dumpfile);
 int status_myfs();
 
 int chmod_myfs(char *name, int mode);
+
+int free_myfs();
 
 #endif
