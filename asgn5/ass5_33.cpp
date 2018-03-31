@@ -3,6 +3,8 @@
 #include <sstream>
 #include <cstdlib>
 #include <stdio.h>
+#include <vector>
+
 #define PAGE_TABLE_SIZE 64
 
 using namespace std;
@@ -28,7 +30,19 @@ void init_pagetable(PageTable *pt)
 		pt->entry[i].modified = 0;
 		pt->entry[i].referenced = 0;
 	}
+}
 
+int get_free_frame(vector<bool> &free_frame, int sz)
+{
+	for(int i=0;i<sz;i++)
+	{
+		if(free_frame[i])
+		{
+			free_frame = false;
+			return i;
+		}
+	}
+	return -1;
 }
 
 int main()
@@ -42,6 +56,7 @@ int main()
 	cin>>vm_size;
 	cout<<vm_size<<endl;
 	getchar();
+	vector<bool> free_frame(vm_size,true);
 	while(getline(cin,line))
 	{
 		if(line[0] == '#') continue;
@@ -52,6 +67,7 @@ int main()
 		int referenced;
 		ss>>referenced;
 		cout<<rw<<" "<<referenced<<endl;
+
 		
 	}
 
